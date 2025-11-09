@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light dark; }
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+}
+
+/* Suavizar scroll y estética general */
+* {
+  scrollbar-width: thin;
+}
+
+/* Scrollbars en WebKit */
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(100,116,139,.4); /* slate-500/40 */
+  border-radius: 0.75rem;
+}
+::-webkit-scrollbar-track {
+  background-color: rgba(148,163,184,.15); /* slate-400/15 */
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+/* Utilidades estéticas alineadas con ISO/IEC 25010 (Estética UI) */
+@layer components {
+  .ui-card { @apply rounded-xl border border-slate-200/60 bg-white p-6 shadow-sm dark:border-slate-700/60 dark:bg-slate-900; }
+  .ui-title { @apply text-lg font-semibold text-slate-900 dark:text-white; }
+  .ui-subtitle { @apply mt-1 text-sm text-slate-600 dark:text-slate-300; }
+
+  .card-muted { @apply rounded-lg border border-slate-200/60 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900; }
+
+  .btn { @apply rounded-md px-3 py-2 text-sm font-medium transition-colors; }
+  .btn-secondary { @apply border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800; }
+  .btn-driver { @apply bg-emerald-600 text-white hover:bg-emerald-700; }
+  .btn-client { @apply bg-blue-600 text-white hover:bg-blue-700; }
+  .btn-cyan { @apply bg-cyan-600 text-white hover:bg-cyan-700; }
+  .btn-danger { @apply border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-800/40; }
+
+  .badge { @apply inline-flex items-center rounded px-2 py-1 text-xs; }
+  .badge-driver { @apply bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300; }
+  .badge-client { @apply bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300; }
+}
