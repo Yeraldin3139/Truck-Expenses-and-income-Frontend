@@ -38,7 +38,6 @@ function Sidebar({ currentView, onChangeView, driverLogged = false }) {
         {[
           { key: 'driver', label: 'Conductor' },
           { key: 'map', label: 'Mapa' },
-          { key: 'client', label: 'Cliente' },
         ].map((item) => (
           <button
             key={item.key}
@@ -103,10 +102,6 @@ export default function App() {
   const [mapMode, setMapMode] = useState('driver')
   const [driverSession, setDriverSession] = useState(() => {
     const saved = localStorage.getItem('driverAuth')
-    return saved ? JSON.parse(saved) : { isLoggedIn: false }
-  })
-  const [clientSession, setClientSession] = useState(() => {
-    const saved = localStorage.getItem('clientAuth')
     return saved ? JSON.parse(saved) : { isLoggedIn: false }
   })
 
@@ -194,16 +189,7 @@ export default function App() {
           {currentView === 'map' && (
             <MapModule externalCenter={mapCenter} mode={mapMode} />
           )}
-          {currentView === 'client' && (
-            <ClientModule
-              onViewMap={(center) => {
-                setMapCenter(center)
-                setMapMode('client')
-                setCurrentView('map')
-              }}
-              onAuthChange={(auth) => setClientSession(auth)}
-            />
-          )}
+          {/* Perfil de Cliente deshabilitado */}
         </main>
       </div>
 
