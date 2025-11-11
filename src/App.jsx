@@ -331,6 +331,7 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
   const [serviceRoutesByPlaca, setServiceRoutesByPlaca] = useState({})
   const [currentPos, setCurrentPos] = useState(null)
   const [watching, setWatching] = useState(false)
+  const [geoError, setGeoError] = useState('')
 
   // Búsqueda de ciudades/municipios/departamentos (Nominatim)
   const [query, setQuery] = useState('')
@@ -418,6 +419,7 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
         (pos) => {
           const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           setCurrentPos(latlng)
+          setGeoError('')
           setRoutesByPlaca((prev) => {
             const next = { ...prev }
             const arr = Array.isArray(next[trackingPlaca]) ? next[trackingPlaca] : []
@@ -429,6 +431,7 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
         },
         (err) => {
           console.warn('Geolocation error', err)
+          setGeoError(err?.message || 'Error de geolocalización')
         },
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
       )
@@ -437,6 +440,13 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
       if (watchId !== null && 'geolocation' in navigator) navigator.geolocation.clearWatch(watchId)
     }
   }, [watching, trackingPlaca])
+
+  // Autoactivar GPS cuando el modo es "driver" y hay placa
+  useEffect(() => {
+    if (mode === 'driver' && trackingPlaca && !watching) {
+      setWatching(true)
+    }
+  }, [mode, trackingPlaca])
 
   const [newStop, setNewStop] = useState({ nombre: '', lat: '', lng: '', carga: '', destino: '' })
   const [stopPlaca, setStopPlaca] = useState('')
@@ -587,6 +597,15 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
         <div className="flex items-center gap-2">
           <button onClick={() => setWatching(true)} className="btn btn-driver">Iniciar seguimiento</button>
           <button onClick={() => setWatching(false)} className="btn btn-secondary">Detener</button>
+          {watching && (
+            <span className="text-xs text-emerald-700 dark:text-emerald-300">GPS activo</span>
+          )}
+          {!watching && (
+            <span className="text-xs text-slate-600 dark:text-slate-300">GPS inactivo</span>
+          )}
+          {geoError && (
+            <span className="text-xs text-rose-600 dark:text-rose-400">{geoError}</span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-600 dark:text-slate-300">Mostrar carros:</span>
