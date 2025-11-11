@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import 'leaflet/dist/leaflet.css'
 import axios from 'axios'
+import { api } from './api'
 
 function Navbar({ onAddIncome, onAddExpense, onToggleTheme, theme, showFinanceActions = false, showThemeToggle = false }) {
   return (
@@ -276,7 +277,7 @@ function ApiTest() {
       <button
         onClick={async () => {
           try {
-            const res = await axios.get('/api/shipments')
+            const res = await api.get('/shipments')
             alert('Hay ' + res.data.length + ' envíos (GET /api/shipments)')
           } catch (error) {
             alert('Error al conectar con la API: ' + (error.message || 'Backend no disponible'))
