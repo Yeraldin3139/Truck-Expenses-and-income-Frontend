@@ -39,6 +39,7 @@ function Sidebar({ currentView, onChangeView, driverLogged = false }) {
         {[
           { key: 'driver', label: 'Conductor' },
           { key: 'map', label: 'Mapa' },
+          { key: 'notes', label: 'Notas y recordatorios' },
         ].map((item) => (
           <button
             key={item.key}
@@ -190,6 +191,9 @@ export default function App() {
           {currentView === 'map' && (
             <MapModule externalCenter={mapCenter} mode={mapMode} />
           )}
+          {currentView === 'notes' && (
+            <NotesModule cars={trucks} />
+          )}
           {/* Perfil de Cliente deshabilitado */}
         </main>
       </div>
@@ -245,6 +249,252 @@ export default function App() {
         </div>
       </Modal>
     </div>
+  )
+}
+
+function NotesModule({ cars = [] }) {
+  const [notes, setNotes] = useState([])
+  const [upcoming, setUpcoming] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  // Derivar placas: priorizar las guardadas en driverCars (usadas en otros módulos)
+  const getSavedPlates = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('driverCars') || '[]')
+      return Array.isArray(stored)
+        ? [...new Set(stored.map((c) => c && typeof c === 'object' ? c.placa : null).filter(Boolean))]
+        : []
+    } catch {
+      return []
+    }
+  }
+  const propPlates = Array.isArray(cars)
+    ? [...new Set(cars.map((c) => (typeof c === 'string' ? c : (c && c.placa) || null)).filter(Boolean))]
+    : []
+  const [plates, setPlates] = useState(() => {
+    const saved = getSavedPlates()
+    return saved.length ? saved : propPlates
+  })
+  useEffect(() => {
+    // Intentar refrescar placas si driverCars cambia por fuera
+    const refresh = () => {
+      const saved = getSavedPlates()
+      const next = saved.length ? saved : propPlates
+      setPlates((prev) => (JSON.stringify(prev) !== JSON.stringify(next) ? next : prev))
+    }
+    const onStorage = (e) => {
+      if (e.key === 'driverCars') refresh()
+    }
+    window.addEventListener('storage', onStorage)
+    const id = setInterval(refresh, 2000)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      clearInterval(id)
+    }
+  }, [propPlates])
+
+  const [form, setForm] = useState({ truck: '', title: '', text: '', hasDate: false, date: '' })
+
+  // Asegurar que el camión seleccionado sea una placa válida
+  useEffect(() => {
+    if (!form.truck || !plates.includes(form.truck)) {
+      setForm((f) => ({ ...f, truck: plates[0] || '' }))
+    }
+  }, [plates])
+
+  // Cargar notas y próximos desde el backend
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const params = form.truck ? { plate: form.truck } : {}
+        const [listRes, upcRes] = await Promise.all([
+          api.get('/notes', { params }),
+          api.get('/notes/upcoming', { params })
+        ])
+        setNotes(Array.isArray(listRes.data) ? listRes.data : [])
+        setUpcoming(Array.isArray(upcRes.data) ? upcRes.data : [])
+      } catch (e) {
+        setError(e.message || 'Error cargando notas')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.truck])
+
+  const addNote = () => {
+    if (!form.title && !form.text) return alert('Escribe un título o una nota')
+    if (!form.truck) return alert('Selecciona una placa')
+    const payload = {
+      plate: form.truck,
+      title: form.title.trim() || null,
+      text: form.text.trim() || null,
+      dueDate: form.hasDate ? form.date : null,
+      done: false,
+    }
+    setLoading(true)
+    api.post('/notes', payload)
+      .then((res) => {
+        const saved = res.data
+        setNotes((prev) => [saved, ...prev])
+        if (saved.dueDate) {
+          setUpcoming((prev) => {
+            // Insertar manteniendo orden por fecha
+            const next = [...prev, saved]
+            return next
+              .filter((n) => !n.done && n.dueDate)
+              .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))
+          })
+        }
+        setForm({ truck: plates[0] || '', title: '', text: '', hasDate: false, date: '' })
+      })
+      .catch((e) => setError(e.message || 'Error guardando nota'))
+      .finally(() => setLoading(false))
+  }
+
+  const toggleDone = (id) => {
+    const current = notes.find((n) => n.id === id)
+    if (!current) return
+    const nextDone = !current.done
+    setLoading(true)
+    api.patch(`/notes/${id}`, { done: nextDone })
+      .then((res) => {
+        const saved = res.data
+        setNotes((list) => list.map((n) => (n.id === id ? saved : n)))
+        setUpcoming((prev) => prev.map((n) => (n.id === id ? saved : n)).filter((n) => !n.done))
+      })
+      .catch((e) => setError(e.message || 'Error actualizando nota'))
+      .finally(() => setLoading(false))
+  }
+
+  const removeNote = (id) => {
+    setLoading(true)
+    api.delete(`/notes/${id}`)
+      .then(() => {
+        setNotes((list) => list.filter((n) => n.id !== id))
+        setUpcoming((list) => list.filter((n) => n.id !== id))
+      })
+      .catch((e) => setError(e.message || 'Error eliminando nota'))
+      .finally(() => setLoading(false))
+  }
+
+  return (
+    <section className="grid gap-6">
+      <div className="ui-card">
+        <h2 className="ui-title">Notas y recordatorios</h2>
+        <p className="ui-subtitle">Crea recordatorios por camión, con fecha opcional (calendario).</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-xs text-slate-600 dark:text-slate-300">Placa</label>
+            <select
+              value={form.truck}
+              onChange={(e) => setForm((f) => ({ ...f, truck: e.target.value }))}
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+            >
+              {(plates.length ? plates : ['']).map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-600 dark:text-slate-300">Título</label>
+            <input
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Mantenimiento, SOAT, revisión, etc."
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs text-slate-600 dark:text-slate-300">Nota</label>
+            <textarea
+              value={form.text}
+              onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+              rows={3}
+              placeholder="Detalle del recordatorio"
+              className="mt-1 w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.hasDate} onChange={(e) => setForm((f) => ({ ...f, hasDate: e.target.checked }))} />
+              Añadir fecha (calendario)
+            </label>
+            {form.hasDate && (
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+              />
+            )}
+          </div>
+          <div>
+            <button onClick={addNote} className="btn btn-cyan">Agregar nota</button>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="ui-card">
+          <p className="ui-subtitle text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div className="ui-card">
+          <h3 className="ui-title">Próximos recordatorios</h3>
+          <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-700">
+            {upcoming.map((n) => (
+              <li key={n.id} className="py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{n.title || '(Sin título)'} <span className="badge badge-client ml-2">{n.plate}</span></p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Para: {n.dueDate}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => toggleDone(n.id)} className="btn btn-driver">Marcar hecho</button>
+                    <button onClick={() => removeNote(n.id)} className="btn btn-danger">Eliminar</button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="ui-card">
+        <h3 className="ui-title">Todas las notas</h3>
+        {loading && <p className="ui-subtitle">Cargando...</p>}
+        {notes.length === 0 && !loading ? (
+          <p className="ui-subtitle">No hay notas registradas.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-700">
+            {notes.map((n) => (
+              <li key={n.id} className="py-3">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`badge ${n.done ? 'badge-driver' : 'badge-client'}`}>{n.done ? 'Hecho' : 'Pendiente'}</span>
+                      <span className="text-sm font-medium truncate">{n.title || '(Sin título)'} <span className="text-xs text-slate-500">{n.plate && `· ${n.plate}`}</span></span>
+                    </div>
+                    {n.dueDate && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Fecha: {n.dueDate}</p>}
+                    {n.text && <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{n.text}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => toggleDone(n.id)} className="btn btn-secondary">{n.done ? 'Deshacer' : 'Hecho'}</button>
+                    <button onClick={() => removeNote(n.id)} className="btn btn-danger">Eliminar</button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -341,6 +591,17 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
   const [searchMarker, setSearchMarker] = useState(null)
   const [selectedPolygon, setSelectedPolygon] = useState(null)
   const [clientShipment, setClientShipment] = useState(null)
+  const [shipments, setShipments] = useState([])
+  const [shipError, setShipError] = useState('')
+  const [shipLoading, setShipLoading] = useState(false)
+  const [shipmentForm, setShipmentForm] = useState({
+    senderName: '',
+    recipientName: '',
+    fromAddress: '',
+    toAddress: '',
+    weightKg: '',
+    paidByRecipient: false,
+  })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -724,6 +985,108 @@ function MapModule({ externalCenter = null, mode = 'driver' }) {
                 </div>
               </div>
               <button onClick={addStop} className="w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Guardar parada</button>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+            <h3 className="text-sm font-medium text-slate-900 dark:text-white">Registrar envío</h3>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Crea un envío y calcula precio automáticamente (500 COP/kg).</p>
+            <div className="mt-2 grid grid-cols-1 gap-2">
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-300">Remitente</label>
+                <input type="text" value={shipmentForm.senderName} onChange={(e) => setShipmentForm((f) => ({ ...f, senderName: e.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-300">Destinatario</label>
+                <input type="text" value={shipmentForm.recipientName} onChange={(e) => setShipmentForm((f) => ({ ...f, recipientName: e.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-300">Origen (dirección)</label>
+                <input type="text" value={shipmentForm.fromAddress} onChange={(e) => setShipmentForm((f) => ({ ...f, fromAddress: e.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-300">Destino (dirección)</label>
+                <input type="text" value={shipmentForm.toAddress} onChange={(e) => setShipmentForm((f) => ({ ...f, toAddress: e.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-300">Peso (kg)</label>
+                <input type="number" value={shipmentForm.weightKg} onChange={(e) => setShipmentForm((f) => ({ ...f, weightKg: e.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <input type="checkbox" checked={shipmentForm.paidByRecipient} onChange={(e) => setShipmentForm((f) => ({ ...f, paidByRecipient: e.target.checked }))} />
+                Paga el destinatario
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!shipmentForm.senderName || !shipmentForm.recipientName || !shipmentForm.fromAddress || !shipmentForm.toAddress || !shipmentForm.weightKg) {
+                      return alert('Completa todos los campos del envío')
+                    }
+                    setShipLoading(true)
+                    setShipError('')
+                    try {
+                      const payload = {
+                        senderName: shipmentForm.senderName,
+                        recipientName: shipmentForm.recipientName,
+                        fromAddress: shipmentForm.fromAddress,
+                        toAddress: shipmentForm.toAddress,
+                        weightKg: Number(shipmentForm.weightKg),
+                        paidByRecipient: !!shipmentForm.paidByRecipient,
+                      }
+                      const res = await api.post('/shipments', payload)
+                      const saved = res.data
+                      setShipments((prev) => [saved, ...prev])
+                      alert(`Envío creado. Precio: $${Number(saved.priceCOP).toLocaleString('es-CO')} COP`)
+                      setShipmentForm({ senderName: '', recipientName: '', fromAddress: '', toAddress: '', weightKg: '', paidByRecipient: false })
+                    } catch (e) {
+                      setShipError(e.message || 'Error creando envío')
+                    } finally {
+                      setShipLoading(false)
+                    }
+                  }}
+                  className="rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+                >
+                  {shipLoading ? 'Guardando...' : 'Crear envío'}
+                </button>
+                <button
+                  onClick={async () => {
+                    setShipLoading(true)
+                    setShipError('')
+                    try {
+                      const res = await api.get('/shipments')
+                      setShipments(Array.isArray(res.data) ? res.data : [])
+                    } catch (e) {
+                      setShipError(e.message || 'Error cargando envíos')
+                    } finally {
+                      setShipLoading(false)
+                    }
+                  }}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Cargar envíos
+                </button>
+              </div>
+              {shipError && <p className="text-xs text-rose-600 dark:text-rose-400">{shipError}</p>}
+            </div>
+            <div className="mt-3">
+              {shipments.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">No hay envíos registrados.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {shipments.map((s) => (
+                    <li key={s.id} className="rounded-md border border-slate-200 p-2 text-xs dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{s.senderName} → {s.recipientName}</p>
+                          <p className="text-slate-500 truncate">{s.fromAddress} → {s.toAddress}</p>
+                          <p className="text-slate-500">{s.weightKg} kg · ${Number(s.priceCOP).toLocaleString('es-CO')} COP</p>
+                        </div>
+                        <span className="rounded-full px-2 py-1 text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{s.paidByRecipient ? 'Paga destinatario' : 'Paga remitente'}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
