@@ -11,6 +11,7 @@ import {
   scheduleService,
   tripService,
 } from "./api";
+import GlobalLoading from "./GlobalLoading";
 
 function Navbar({
   onAddIncome,
@@ -22,43 +23,47 @@ function Navbar({
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-cyan-400/50 bg-gradient-to-r from-cyan-600 via-fuchsia-600 to-amber-500 text-white shadow">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-3 sm:px-4 py-2 sm:py-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <img
             src="/user-logo.png"
             alt="Truck"
-            className="h-10 w-10 rounded-md object-cover ring-2 ring-white/50"
+            className="h-8 w-8 sm:h-10 sm:w-10 rounded-md object-cover ring-2 ring-white/50 flex-shrink-0"
           />
-          <div>
-            <h1 className="text-lg font-semibold">
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-lg font-semibold truncate">
               Truck (Expenses and income)
             </h1>
-            <p className="text-xs opacity-90">Ingresos y gastos de camiones</p>
+            <p className="text-xs opacity-90 hidden sm:block">
+              Ingresos y gastos de camiones
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {showFinanceActions && (
             <>
               <button
                 onClick={onAddIncome}
-                className="rounded-md bg-lime-500 px-3 py-2 text-sm font-medium text-white hover:bg-lime-600"
+                className="rounded-md bg-lime-500 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white hover:bg-lime-600"
               >
-                Añadir ingreso
+                <span className="hidden sm:inline">Añadir ingreso</span>
+                <span className="sm:hidden">+I</span>
               </button>
               <button
                 onClick={onAddExpense}
-                className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                className="rounded-md bg-rose-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white hover:bg-rose-700"
               >
-                Añadir gasto
+                <span className="hidden sm:inline">Añadir gasto</span>
+                <span className="sm:hidden">+G</span>
               </button>
             </>
           )}
           {showThemeToggle && (
             <button
               onClick={onToggleTheme}
-              className="rounded-md border border-white/60 px-3 py-2 text-sm font-medium text-white/90 hover:bg-white/10"
+              className="rounded-md border border-white/60 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white/90 hover:bg-white/10"
             >
-              {theme === "dark" ? "Claro" : "Oscuro"}
+              {theme === "dark" ? "☼" : "☾"}
             </button>
           )}
         </div>
@@ -68,28 +73,99 @@ function Navbar({
 }
 
 function Sidebar({ currentView, onChangeView, driverLogged = false }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const menuItems = [
+    { key: "driver", label: "Conductor" },
+    { key: "map", label: "Mapa" },
+    { key: "notes", label: "Notas y recordatorios" },
+  ];
+
+  const handleNavClick = (key) => {
+    onChangeView(key);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <aside className="hidden w-64 border-r border-cyan-200/60 bg-cyan-50 p-4 dark:border-slate-700/60 dark:bg-slate-900 md:block">
-      <nav className="space-y-1">
-        {[
-          { key: "driver", label: "Conductor" },
-          { key: "map", label: "Mapa" },
-          { key: "notes", label: "Notas y recordatorios" },
-        ].map((item) => (
-          <button
-            key={item.key}
-            onClick={() => onChangeView(item.key)}
-            className={`w-full text-left rounded-md px-3 py-2 text-sm ${
-              currentView === item.key
-                ? "bg-cyan-100 text-cyan-900 ring-1 ring-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-100"
-                : "text-slate-700 hover:bg-cyan-50 dark:text-slate-300 dark:hover:bg-slate-800"
-            }`}
+    <>
+      {/* Botón hamburguesa para móvil */}
+      <button
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        className="fixed bottom-4 right-4 z-30 md:hidden rounded-full bg-cyan-600 p-3 text-white shadow-lg hover:bg-cyan-700"
+      >
+        <svg
+          className="h-6 w-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          {mobileMenuOpen ? (
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          ) : (
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          )}
+        </svg>
+      </button>
+
+      {/* Menú móvil */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-20 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <nav
+            className="absolute bottom-0 left-0 right-0 rounded-t-2xl border-t border-cyan-200/60 bg-cyan-50 p-4 dark:border-slate-700/60 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
           >
-            {item.label}
-          </button>
-        ))}
-      </nav>
-    </aside>
+            <div className="space-y-2">
+              {menuItems.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => handleNavClick(item.key)}
+                  className={`w-full text-left rounded-md px-4 py-3 text-sm font-medium ${
+                    currentView === item.key
+                      ? "bg-cyan-600 text-white"
+                      : "text-slate-700 hover:bg-cyan-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </nav>
+        </div>
+      )}
+
+      {/* Sidebar desktop */}
+      <aside className="hidden w-64 border-r border-cyan-200/60 bg-cyan-50 p-4 dark:border-slate-700/60 dark:bg-slate-900 md:block">
+        <nav className="space-y-1">
+          {menuItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => onChangeView(item.key)}
+              className={`w-full text-left rounded-md px-3 py-2 text-sm ${
+                currentView === item.key
+                  ? "bg-cyan-100 text-cyan-900 ring-1 ring-cyan-300 dark:bg-cyan-900/40 dark:text-cyan-100"
+                  : "text-slate-700 hover:bg-cyan-50 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+    </>
   );
 }
 
@@ -274,121 +350,139 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <Navbar
-        onAddIncome={openIncome}
-        onAddExpense={openExpense}
-        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        theme={theme}
-        showFinanceActions={false}
-        showThemeToggle={false}
-      />
-
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
-        <Sidebar
-          currentView={currentView}
-          onChangeView={setCurrentView}
-          driverLogged={!!driverSession.isLoggedIn}
+    <>
+      <GlobalLoading />
+      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <Navbar
+          onAddIncome={openIncome}
+          onAddExpense={openExpense}
+          onToggleTheme={() =>
+            setTheme((t) => (t === "dark" ? "light" : "dark"))
+          }
+          theme={theme}
+          showFinanceActions={false}
+          showThemeToggle={false}
         />
 
-        <main className="flex-1">
-          {/* Dashboard retirado */}
+        <div className="mx-auto flex max-w-7xl gap-3 sm:gap-6 px-3 sm:px-4 py-3 sm:py-6">
+          <Sidebar
+            currentView={currentView}
+            onChangeView={setCurrentView}
+            driverLogged={!!driverSession.isLoggedIn}
+          />
 
-          {currentView === "driver" && (
-            <DriverModule
-              onGoToMap={(placa) => {
-                if (!placa)
-                  return alert("Primero inicia sesión y asegura una placa");
-                localStorage.setItem(
-                  "mapCommand",
-                  JSON.stringify({ action: "startServiceCapture", placa })
-                );
-                setMapMode("driver");
-                setCurrentView("map");
-              }}
-              onAuthChange={(auth) => setDriverSession(auth)}
-            />
-          )}
+          <main className="flex-1 min-w-0">
+            {/* Dashboard retirado */}
 
-          {currentView === "map" && (
-            <MapModule externalCenter={mapCenter} mode={mapMode} />
-          )}
-          {currentView === "notes" && <NotesModule cars={trucks} />}
-          {/* Perfil de Cliente deshabilitado */}
-        </main>
-      </div>
+            {currentView === "driver" && (
+              <DriverModule
+                onGoToMap={(placa) => {
+                  if (!placa)
+                    return alert("Primero inicia sesión y asegura una placa");
+                  localStorage.setItem(
+                    "mapCommand",
+                    JSON.stringify({ action: "startServiceCapture", placa })
+                  );
+                  setMapMode("driver");
+                  setCurrentView("map");
+                }}
+                onAuthChange={(auth) => setDriverSession(auth)}
+              />
+            )}
 
-      <Modal
-        open={!!modal.type}
-        title={modal.type === "ingreso" ? "Añadir ingreso" : "Añadir gasto"}
-        onClose={closeModal}
-        onSubmit={submitModal}
-        submitLabel={
-          modal.type === "ingreso" ? "Registrar ingreso" : "Registrar gasto"
-        }
-      >
-        <div className="grid gap-3">
-          <div>
-            <label className="block text-xs text-slate-600 dark:text-slate-300">
-              Camión
-            </label>
-            <select
-              value={form.truck}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, truck: e.target.value }))
-              }
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
-            >
-              {trucks.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-slate-600 dark:text-slate-300">
-              Monto (COP)
-            </label>
-            <input
-              type="number"
-              value={form.amount}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, amount: e.target.value }))
-              }
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-600 dark:text-slate-300">
-              Fecha
-            </label>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-600 dark:text-slate-300">
-              Detalle
-            </label>
-            <input
-              type="text"
-              value={form.note}
-              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-              placeholder="Descripción breve"
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
-            />
-          </div>
+            {currentView === "map" && (
+              <MapModule externalCenter={mapCenter} mode={mapMode} />
+            )}
+            {currentView === "notes" && <NotesModule />}
+            {/* Perfil de Cliente deshabilitado */}
+          </main>
         </div>
-      </Modal>
-    </div>
+
+        <Modal
+          open={!!modal.type}
+          title={modal.type === "ingreso" ? "Añadir ingreso" : "Añadir gasto"}
+          onClose={closeModal}
+          onSubmit={submitModal}
+          submitLabel={
+            modal.type === "ingreso" ? "Registrar ingreso" : "Registrar gasto"
+          }
+        >
+          <div className="grid gap-3">
+            <div>
+              <label className="block text-xs text-slate-600 dark:text-slate-300">
+                Camión
+              </label>
+              <select
+                value={form.truck}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, truck: e.target.value }))
+                }
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+              >
+                {trucks.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600 dark:text-slate-300">
+                Monto (COP)
+              </label>
+              <input
+                type="number"
+                value={form.amount}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, amount: e.target.value }))
+                }
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600 dark:text-slate-300">
+                Fecha
+              </label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, date: e.target.value }))
+                }
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600 dark:text-slate-300">
+                Detalle
+              </label>
+              <input
+                type="text"
+                value={form.note}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, note: e.target.value }))
+                }
+                placeholder="Descripción breve"
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
+              />
+            </div>
+          </div>
+        </Modal>
+      </div>
+    </>
   );
 }
 
-function NotesModule({ cars = [] }) {
+function NotesModule() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [cars, setCars] = useState([]);
+
+  useEffect(() => {
+    carService
+      .getAll()
+      .then((res) => setCars(res.data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     noteService
@@ -536,9 +630,9 @@ function NotesModule({ cars = [] }) {
               }
               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-slate-700"
             >
-              {(plates.length ? plates : [""]).map((p) => (
-                <option key={p} value={p}>
-                  {p}
+              {cars.map((c) => (
+                <option key={c.id} value={c.placa}>
+                  {c.placa}
                 </option>
               ))}
             </select>

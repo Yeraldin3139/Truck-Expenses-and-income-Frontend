@@ -4,35 +4,54 @@ const baseURL = "https://truck-expenses-and-income-backend-1.onrender.com/api";
 
 export const api = axios.create({
   baseURL,
-  timeout: 10000,
-  headers: { Accept: "application/json" },
-});
+  timeout: 60000, // 1 minuto
+  headers: { 'Accept': 'application/json' }
+})
 
-// Interceptor de petición: marca inicio para medir duración
+// Estado global de loading
+let loadingCount = 0
+const loadingCallbacks = new Set()
+
+export const subscribeToLoading = (callback) => {
+  loadingCallbacks.add(callback)
+  return () => loadingCallbacks.delete(callback)
+}
+
+const notifyLoading = (isLoading) => {
+  loadingCallbacks.forEach(cb => cb(isLoading))
+}
+
+// Interceptor de petición: marca inicio para medir duración y activa loading
 api.interceptors.request.use((config) => {
-  config.metadata = { startTime: Date.now() };
-  return config;
-});
+  config.metadata = { startTime: Date.now() }
+  loadingCount++
+  if (loadingCount === 1) notifyLoading(true)
+  return config
+})
 
-// Interceptor de respuesta: maneja errores y registra latencia
+// Interceptor de respuesta: maneja errores, registra latencia y desactiva loading
 api.interceptors.response.use(
   (response) => {
     if (response.config?.metadata?.startTime) {
-      const duration = Date.now() - response.config.metadata.startTime;
+      const duration = Date.now() - response.config.metadata.startTime
       console.log(
         `[API] ${response.config.method?.toUpperCase()} ${
           response.config.url
         } (${duration}ms)`
-      );
+      )
     }
-    return response;
+    loadingCount--
+    if (loadingCount === 0) notifyLoading(false)
+    return response
   },
   (error) => {
-    const mapped = mapAxiosError(error);
-    console.error("[API Error]", mapped);
-    return Promise.reject(mapped);
+    loadingCount--
+    if (loadingCount === 0) notifyLoading(false)
+    const mapped = mapAxiosError(error)
+    console.error("[API Error]", mapped)
+    return Promise.reject(mapped)
   }
-);
+)
 
 function mapAxiosError(error) {
   if (error.code === "ECONNABORTED") {
